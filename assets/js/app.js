@@ -1,4 +1,4 @@
-﻿/* app.js - Control de Gastos v1 */
+/* app.js - Control de Gastos v1 */
 (async function(){
   const appEl = document.getElementById("app");
   const loadingEl = document.getElementById("loading");
@@ -1463,9 +1463,59 @@ const listNode = U.el("div",{class:"list"});
       }
     };
 
+
+    // Importar pegando texto JSON (útil en móvil cuando el selector de archivos no encuentra el .json)
+    const pasteBtn = U.el("button",{class:"btn", text:"Pegar JSON (restaurar)"});
+    pasteBtn.onclick = async ()=>{
+      const ta = U.el("textarea",{class:"input", placeholder:"Pega aquí el contenido completo del backup JSON…", style:"min-height:220px;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;white-space:pre;"});
+      const tip = U.el("div",{class:"tiny muted", html:"Consejo: En el ordenador abre el .json, selecciona todo (Ctrl+A), copia (Ctrl+C) y envíalo por WhatsApp. En el móvil, copia el texto del chat y pégalo aquí."});
+
+      const doBtn = U.el("button",{class:"btn danger", text:"Restaurar"});
+      const cancelBtn = U.el("button",{class:"btn", text:"Cancelar"});
+
+      const modal = U.openModal({
+        title:"Pegar JSON",
+        contentNode: U.el("div",{class:"grid", style:"gap:10px"},[tip, ta]),
+        footerNodes:[cancelBtn, doBtn]
+      });
+
+      cancelBtn.onclick = ()=> modal.close();
+      doBtn.onclick = async ()=>{
+        const raw = String(ta.value||"").trim();
+        if(!raw){ U.toast("Pega el contenido JSON."); ta.focus(); return; }
+
+        const ok = await U.confirmDialog({
+          title:"Restaurar copia",
+          message:"Se reemplazarán los datos actuales por los del backup. ¿Continuar?",
+          okText:"Restaurar",
+          cancelText:"Cancelar"
+        });
+        if(!ok) return;
+
+        try{
+          const payload = JSON.parse(raw);
+          if(!payload || !payload.settings || !Array.isArray(payload.tx) || !Array.isArray(payload.tr)){
+            U.toast("El texto no parece un backup válido.");
+            return;
+          }
+          await DB.importAll(state.db, payload);
+          state.settings = payload.settings;
+          applyTheme();
+          U.toast("Backup restaurado.");
+          state.periodOffset = 0;
+          modal.close();
+          location.hash = "#/panel";
+          await render();
+        }catch(err){
+          console.error(err);
+          U.toast("Error importando JSON pegado.");
+        }
+      };
+    };
+
     backupCard.appendChild(U.el("div",{class:"grid cols2"},[
       U.el("div",{},[expBtn]),
-      U.el("div",{},[impInp, U.el("div",{style:"margin-top:10px"}, impBtn)])
+      U.el("div",{},[impInp, U.el("div",{style:"margin-top:10px"}, [impBtn, U.el("div",{style:"height:8px"}), pasteBtn])])
     ]));
 
     const wipeBtn = U.el("button",{class:"btn danger", text:"Borrar todos los datos"});
